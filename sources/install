@@ -4,7 +4,7 @@
 # check if a given user exists
 #
 # @author  Björn Hempel
-# @version 1.0
+# @version 1.0 (2018-05-29)
 # ------------
 userExists ()
 {
@@ -52,7 +52,7 @@ fi
 
 # some other variables
           pathRoot="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-     publicKeyFile="$pathRoot/id_rsa.pub"
+     publicKeyFile="$pathRoot/../keys/id_rsa.pub"
 authorizedKeysFile=$homePath'/.ssh/authorized_keys'
            sshPath=$(dirname "$authorizedKeysFile")
           sameUser=$([ "$user" == "$currentUser" ] && echo true || echo false)
