@@ -18,7 +18,7 @@ root$ usermod bjoern -g users -G bjoern,sudo -p $(openssl passwd -1 -salt shaker
 root$ cd /home/bjoern
 root$ git clone git@github.com:bjoern-hempel/my-public-key.git
 root$ cd my-public-key
-root$ ./install bjoern
+root$ sources/install bjoern
 This will install the public key to user "bjoern".
 The public key will be installed at: /home/bjoern/.ssh/authorized_keys
 
