@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# ------------
+# check if a given user exists
+#
+# @author  Björn Hempel
+# @version 1.0
+# ------------
+userExists ()
+{
+  `id -u "$1" >/dev/null 2>&1;`
+}
+
+# initial values
+FORCE_YES=false
+    DEBUG=false
+
+# declare parameter list array
+PARAMETERS=()
+
+# read arguments
+while [[ $# > 0 ]]; do
+    case "$1" in
+    -y|--yes)
+        FORCE_YES=true
+    ;;
+
+    *)
+        PARAMETERS+=("$1")
+    ;;
+    esac
+    shift
+done
+
+# get the user
+         user=$([ "${#PARAMETERS[@]}" -gt 0 ] && echo ${PARAMETERS[0]} || echo $(whoami))
+  currentUser="$(whoami)"
+currentUserId=$(id -u)
+
+# check the user
+if ! userExists $user; then
+    echo 'The given user does not exist. Abort.' && exit 1
+fi
+
+# get the home path
+homePath=$(eval echo "~$user")
+
+# check the home path
+if [ ! -d "$homePath" ]; then
+    echo 'The given home path does not exist. Abort.' && exit 1
+fi
+
+# some other variables
+          pathRoot="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+     publicKeyFile="$pathRoot/id_rsa.pub"
+authorizedKeysFile=$homePath'/.ssh/authorized_keys'
+           sshPath=$(dirname "$authorizedKeysFile")
+          sameUser=$([ "$user" == "$currentUser" ] && echo true || echo false)
+
+# check credentials
+if ! $sameUser && [ $currentUserId -ne 0 ]; then
+    echo 'If you try to add a public key to another user than you: Run this script as root in this case. Abort.' && exit 1
+fi
+
+# confirm
+if ! $FORCE_YES; then
+    while true; do
+        echo "This will install the public key to user \"$user\"."
+        echo "The public key will be installed at: $authorizedKeysFile"
+        echo
+        echo -n "Do you want to continue? Type y(es) or n(o): "
+        read -n 1 yn && echo
+
+        case $yn in
+            [Yy]* )
+                echo
+                echo
+                break
+                ;;
+
+            [Nn]* )
+                echo
+                echo "The installation was canceled by user."
+                exit 0
+                ;;
+
+            * )
+                echo
+                echo "Please answer yes or no."
+                echo
+                ;;
+        esac
+    done
+fi
+
+# build running environment variable
+RUNAS=""
+if ! $sameUser; then
+  #test if running bash as a different user works
+  sudo -u $user bash -c : && RUNAS="sudo -u $user"
+fi
+
+# some debug things
+if $DEBUG; then
+               sshPath=".$sshPath"
+    authorizedKeysFile=".$authorizedKeysFile"
+fi
+
+# now try to install the public key (with the needed user)
+$RUNAS bash<<_
+# transfer variable contents
+     publicKeyFile="$publicKeyFile"
+           sshPath="$sshPath"
+authorizedKeysFile="$authorizedKeysFile"
+
+# read public key
+publicKey=\$(cat "\$publicKeyFile")
+
+# create ssh path if it does not exist
+if [ ! -e "\$sshPath" ]; then
+    mkdir -p "\$sshPath" 2>/dev/null 1>/dev/null
+fi
+
+# check ssh path
+if [ ! -e "\$sshPath" ]; then
+    echo "An error occurred while creating the ssh path \$sshPath. Maybe the user do not have the permissions for it?" && exit 1
+fi
+
+# touch authorized keys file, if it does not exist
+if [ ! -f "\$authorizedKeysFile" ]; then
+    touch "\$authorizedKeysFile"
+fi
+
+# add key if key do not exist
+found=\$(grep "\$publicKey" "\$authorizedKeysFile")
+if [ "\$found" != "" ]; then
+    echo "public key already exists"
+else
+    echo "install public key"
+    # add public key
+    echo '' >> \$authorizedKeysFile
+    echo '# Björn Hempel' >> "\$authorizedKeysFile"
+    echo "\$publicKey" >> "\$authorizedKeysFile"
+    echo '' >> "\$authorizedKeysFile"
+    echo 'done...'
+fi
+_
